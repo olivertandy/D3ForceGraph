@@ -1,0 +1,26 @@
+body {
+	background-color: black;
+	color: white;
+	font-family: Arial;
+}
+
+.buttons {
+	background-color: black;
+	color: white;
+	text-align: left;
+	width: 90%;
+	padding: 5px;
+	margin: 5px;
+	border: 3px solid #0088FF;
+	border-radius: 5px;
+	transition-duration: 0.2s;
+}
+
+.buttons:hover {
+	background-color: #0088FF;
+}
+
+#canvas {
+	float: top;
+	position: absolute;
+}

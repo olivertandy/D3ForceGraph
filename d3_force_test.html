@@ -1,0 +1,200 @@
+<!DOCTYPE html>
+<html>
+	<head>
+		<link rel="stylesheet" type="text/css" href="css/main.css">
+	</head>
+	<body>
+		<script src="lib/d3.js"></script>
+		
+		<div id="title">
+			<h1> D3 Force-directed Graph Example </h1>
+		</div>
+				
+		<div id="canvas">
+			
+		</div>
+		
+		<script>
+			var maxDepth = 3;
+			var minChildren = 1;
+			var maxChildren = 4;
+			
+			function randomInt(min, max){
+				return Math.floor(Math.random()*(max - min + 1)) + min;
+			}
+			
+			function randomOctet(){
+				return Math.floor(Math.random()*255);
+			}
+			
+			//functions to ensure uniqueness of randomly-generated octets
+			//TODO make this a class with an internal counter variable
+			//and a next() function
+			function existsInArray(array, value){
+				var output = false;
+				for(var i = 0; i < array.length; i++){
+					if(array[i] == value) output = true;
+				}
+				return output;
+			}
+
+			function randomUniqueOctetSet(n){
+				output = []
+				for(var i = 0; i < n; i++){
+					if(output.length == 255) return output;
+					
+					var newValue;
+					while(true){
+						newValue = Math.floor(Math.random()*255);
+						if(!existsInArray(output, newValue)){
+							break;
+						}
+					}
+					output.push(newValue);
+				}
+				return output;
+			}
+			
+			var octetCounter = 0;
+			var octets = randomUniqueOctetSet(255);
+			
+			//colours: split hues evenly amongst top-level nodes
+			//all descendants then inherit that hue, but successively decrease in sat
+			//radius also decreases
+			
+			//generate hues, sats, radius, octets, then iterate over all nodes
+			//to determine overall colour and individual IPs
+			
+			//recursive function to generate IP tree hierarchy
+			function ipTree(depth, node, hue){
+				if(depth < maxDepth){
+					if(node.children == null)
+						node.children = [];
+					
+					childCount = 3;//randomInt(minChildren, maxChildren);
+					
+					//hue split for top level nodes
+					if(depth == 0){
+						var hues = [];
+						for(var i = 0; i < childCount; i++){
+							hues.push(i * (360.0/childCount));
+						}
+					}
+					
+					for(var i = 0; i < childCount; i++){
+						if(depth == 0) hue = hues[i];
+					
+						var data = {
+							"octet": octets[octetCounter],
+							"hue": hue,
+							"sat": 1 - 0.3*depth,
+							"radius": 15 - 3*depth
+						};
+						octetCounter++;
+						node.children.push(ipTree(depth + 1, d3.hierarchy(data), hue));
+					}
+					
+					return node.copy();
+				}
+				else{
+					return node.copy();
+				}
+			}
+
+			var network_data = ipTree(0, d3.hierarchy({"octet": 10}), 0);
+			
+			var links = [];
+			network_data.links().forEach(function (item, index) {
+				links.push({
+					"source": item.source.data.octet,
+					"target": item.target.data.octet
+				});
+			});
+			
+			var nodes = [];
+			network_data.descendants().forEach(function (item, index) {
+				nodes.push(item.data);
+			});
+			
+			var width = 600;
+			var height = 600;
+			
+			var canvas_svg = d3.select("#canvas")
+				.append("svg")
+				.attr("width", width)
+				.attr("height", height)
+				.attr("id", "canvas_svg");
+			
+			canvas_svg.selectAll("line")
+				.data(links)
+				.enter()
+				.append("line")
+				.style("stroke", "white")
+				.attr("class", "link_lines");
+
+			canvas_svg.selectAll("circle")
+				.data(nodes)
+				.enter()
+				.append("circle")
+				.style("fill", function (d, i) {
+					return d3.hsl(d.hue, d.sat, 0.5).formatHex();
+				})
+				.style("stroke", "white")
+				.attr("class", "node_circles")
+				.attr("cx", function (d, i) {
+					return i*(width/nodes.length);
+				})
+				.attr("cy", function (d, i) {
+					return i*(height/nodes.length);
+				})
+				.attr("r", function(d, i){
+					return d.radius;
+				})
+				.attr("z", 1)
+				.call(d3.drag()
+					.on("start", drag_started)
+					.on("drag", drag_active)
+					.on("end", drag_ended));
+			
+			var simulation = d3.forceSimulation(nodes)
+				.force("charge", d3.forceManyBody())
+				.force("center", d3.forceCenter(width/2, height/2))
+				.on("tick", updateNodePositions);
+			
+			simulation.force("link", d3.forceLink(links)
+				.distance(100)
+				.id(function (d) { return d.octet; }));				
+			
+			function drag_started (d) {
+				if (!d3.event.active) simulation.alphaTarget(0.4).restart();
+				d.fx = d.x;
+				d.fy = d.y;
+			}
+			
+			function drag_active (d) {
+				d.fx = d3.event.x;
+				d.fy = d3.event.y;
+			}
+			
+			function drag_ended (d) {
+				if (!d3.event.active) simulation.alphaTarget(0).restart();
+				d.fx = null;
+				d.fy = null;
+			}
+			
+			function updateNodePositions () {						
+				d3.selectAll(".link_lines")
+					.attr("x1", function (d) { return d.source.x; })
+					.attr("y1", function (d) { return d.source.y; })
+					.attr("x2", function (d) { return d.target.x; })
+					.attr("y2", function (d) { return d.target.y; });
+					
+				d3.selectAll(".node_circles")
+					.attr("cx", function (d) { return d.x; })
+					.attr("cy", function (d) { return d.y; });
+
+				//simulation.alpha(1);
+			}
+		</script>
+	</body>
+</html>
